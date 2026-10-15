@@ -312,6 +312,8 @@ async function buildView(url, type, body, signal) {
 const SHIM = `(()=>{const P=__P__,pend={};let n=0;const post=m=>parent.postMessage(m,'*');
 try{const c={};Object.defineProperty(Document.prototype,'cookie',{configurable:true,get(){return Object.entries(c).map(([k,v])=>k+'='+v).join('; ')},set(s){const p=String(s).split(';'),i=p[0].indexOf('=');if(i<0)return;const k=p[0].slice(0,i).trim(),v=p[0].slice(i+1).trim(),a=p.slice(1).join(';').toLowerCase(),e=/expires=([^;]+)/.exec(a);if(/max-age=[ ]*(0|-)/.test(a)||(e&&Date.parse(e[1])<Date.now()))delete c[k];else c[k]=v}})}catch{}
 for(const nm of ['localStorage','sessionStorage']){try{const d={};Object.defineProperty(window,nm,{configurable:true,value:{getItem:k=>k in d?d[k]:null,setItem:(k,v)=>{d[k]=String(v)},removeItem:k=>{delete d[k]},clear:()=>{for(const k in d)delete d[k]},key:i=>Object.keys(d)[i]??null,get length(){return Object.keys(d).length}}})}catch{}}
+try{Object.defineProperty(window,'caches',{configurable:true,value:{open:()=>Promise.reject(new Error('Cache storage unavailable')),match:()=>Promise.resolve(undefined),has:()=>Promise.resolve(false),keys:()=>Promise.resolve([]),delete:()=>Promise.resolve(false)}})}catch{}
+try{delete Navigator.prototype.serviceWorker}catch{}
 const nav=u=>{try{const x=new URL(u,P);/^https?:$/.test(x.protocol)&&post({t:'nav',url:x.href})}catch{}};
 addEventListener('click',e=>{if(e.defaultPrevented)return;const a=e.target.closest&&e.target.closest('a[href]');if(!a)return;const h=a.getAttribute('href');if(h[0]==='#')return;e.preventDefault();nav(h)});
 addEventListener('submit',e=>{if(e.defaultPrevented)return;e.preventDefault();const f=e.target;if((f.getAttribute('method')||'get').toLowerCase()!=='get')return post({t:'msg',text:'POST forms are not supported.'});const u=new URL(f.getAttribute('action')||P,P);for(const [k,v] of new FormData(f))if(typeof v==='string')u.searchParams.set(k,v);nav(u.href)});
@@ -319,7 +321,10 @@ window.open=u=>{u&&nav(u);return null};
 window.fetch=(u,o)=>new Promise((res,rej)=>{const id=++n;pend[id]={res,rej};try{o=o||{};const h={};new Headers(o.headers||u.headers||{}).forEach((v,k)=>h[k]=v);post({t:'fetch',id,url:new URL(u.url||u,P).href,method:o.method||u.method||'GET',headers:h,body:typeof o.body==='string'?o.body:undefined})}catch(e){rej(e)}});
 addEventListener('message',e=>{const d=e.data,p=d&&pend[d.id];if(!p)return;delete pend[d.id];d.err?p.rej(new TypeError(d.err)):p.res(new Response([101,204,205,304].includes(d.status)?null:d.body,{status:d.status,headers:{'content-type':d.type}}))});
 })();`;
-const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:";
+// false: pages can only use images/fonts this browser inlined itself (private; dynamically added images stay blank).
+// true: pages may load images and fonts straight from their own sites (thumbnails appear, but those sites see your IP).
+const DIRECT_MEDIA = false;
+const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; font-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; media-src data:";
 
 async function buildPage(url, body, signal) {
   const doc = new DOMParser().parseFromString(body, "text/html"); // inert while parsing
@@ -411,9 +416,18 @@ const views = {
   page(box, v) {
     // allow-scripts WITHOUT allow-same-origin: scripts run, but in an opaque origin with no access to this page.
     const fr = el("iframe", {class: "page", sandbox: "allow-scripts", referrerpolicy: "no-referrer", title: v.title, srcdoc: v.srcdoc});
-    let loads = 0;
+    let loads = 0, blocked = 0;
     fr.addEventListener("load", () => { // a second load means the page navigated its own frame away from the proxied copy
-      if (++loads > 1) { loads = 0; fr.srcdoc = v.srcdoc; const t = active(); t.status = {text: "Blocked a page script from navigating the frame directly.", bad: true}; paint(); }
+      if (++loads < 2) return;
+      loads = 0;
+      const t = active();
+      if (++blocked > 2) { // it keeps doing it: stop reloading
+        fr.remove();
+        t.status = {text: "This page keeps redirecting its own frame, so loading was stopped.", bad: true};
+        box.append(el("section", {class: "err"}, el("h2", {}, "Page stopped"),
+          el("p", {}, "Its scripts kept trying to send the page frame to a live site, which this browser blocks. The site probably needs a redirect or cookie this setup can\u2019t provide.")));
+      } else { fr.srcdoc = v.srcdoc; t.status = {text: "Blocked a page script from navigating the frame directly.", bad: true}; }
+      paint();
     });
     box.append(fr);
   },
