@@ -14,7 +14,7 @@ button,input{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 #tabs{display:flex;align-items:flex-end;gap:2px;padding:6px 8px 0;background:#141517;overflow-x:auto;flex:none}
-.tab{display:flex;align-items:center;min-width:110px;max-width:220px;flex:0 1 200px;background:transparent;border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:0}
+.tab{display:flex;align-items:center;min-width:110px;max-width:220px;flex:0 1 200px;border-radius:8px 8px 0 0;border:1px solid transparent;border-bottom:0}
 .tab:hover{background:#1f2023}
 .tab.on{background:var(--surf);border-color:var(--line)}
 .tab .t{flex:1;min-width:0;padding:7px 4px 7px 12px;background:none;border:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mute)}
@@ -30,13 +30,12 @@ button{cursor:pointer}
 #url{flex:1;min-width:0;height:36px;padding:0 14px;background:var(--bg);border:1px solid var(--line);border-radius:18px}
 #url:focus{border-color:var(--acc);outline:none}
 #gobtn{height:36px;padding:0 16px;border-radius:18px;border:0;background:var(--acc);color:#0e1a1d;font-weight:600}
-#bar{height:2px;background:transparent;overflow:hidden;flex:none}
+#bar{height:2px;overflow:hidden;flex:none}
 #bar.on::after{content:"";display:block;height:100%;width:30%;background:var(--acc);animation:slide 1s ease-in-out infinite}
 @keyframes slide{from{margin-left:-30%}to{margin-left:100%}}
-@keyframes spin{to{transform:rotate(360deg)}}
-#reload.spin span{display:inline-block;animation:spin 1s linear infinite}
-@media (prefers-reduced-motion:reduce){#bar.on::after,#reload.spin span{animation-duration:3s}}
-#viewer{flex:1;overflow:auto;min-height:0}
+@media (prefers-reduced-motion:reduce){#bar.on::after{animation-duration:3s}}
+#viewer{flex:1;overflow:auto;min-height:0;position:relative}
+.page{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
 #status{display:flex;justify-content:space-between;gap:12px;padding:4px 12px;background:#141517;border-top:1px solid var(--line);color:var(--mute);font-size:12px;flex:none}
 #st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #code.ok{color:var(--ok)}#code.bad{color:var(--bad)}
@@ -71,7 +70,7 @@ details ul{padding-left:20px}
   <div id="toolbar">
     <button class="nb" id="back" aria-label="Back" title="Back (Alt+Left)">&#8592;</button>
     <button class="nb" id="fwd" aria-label="Forward" title="Forward (Alt+Right)">&#8594;</button>
-    <button class="nb" id="reload" aria-label="Reload" title="Reload"><span>&#8635;</span></button>
+    <button class="nb" id="reload" aria-label="Reload" title="Reload">&#8635;</button>
     <button class="nb" id="home" aria-label="Home" title="Home">&#8962;</button>
     <form id="go" autocomplete="off">
       <input id="url" type="text" aria-label="Address or search" placeholder="Enter an https:// address or search (Ctrl+L)" spellcheck="false">
@@ -89,12 +88,14 @@ details ul{padding-left:20px}
 const PROXY_URL = "https://processors-personal-consist-racial.trycloudflare.com"; // no trailing slash
 const SEARCH_TEMPLATE = "https://duckduckgo.com/html/?q={q}"; // {q} = encoded query
 const TIMEOUT_MS = 12000;
+const RESOURCE_LIMIT = 12; // max CSS/JS/image files fetched per page (your proxy allows 30 requests/minute)
+const MAX_IMAGE_BYTES = 1500000;
 const HOME = "about:home";
 const SHORTCUTS = [
   {label:"GitHub Zen", url:"https://api.github.com/zen"},
   {label:"GitHub user (JSON)", url:"https://api.github.com/users/octocat"},
   {label:"Sample post (JSON)", url:"https://jsonplaceholder.typicode.com/posts/1"},
-  {label:"JSONPlaceholder site (HTML)", url:"https://jsonplaceholder.typicode.com/"}
+  {label:"JSONPlaceholder site (HTML + JS)", url:"https://jsonplaceholder.typicode.com/"}
 ];
 
 /* ---------- Helpers ---------- */
@@ -111,6 +112,12 @@ function el(tag, props = {}, ...kids) {
 }
 const hostOf = u => { try { return new URL(u).host; } catch { return u; } };
 const kb = n => n < 1024 ? n + " B" : (n / 1024).toFixed(1) + " KB";
+async function pfetch(url, outer, ms = TIMEOUT_MS) { // every network request goes through here
+  const c = new AbortController(), stop = () => c.abort(), t = setTimeout(stop, ms);
+  outer && outer.addEventListener("abort", stop);
+  try { return await fetch(PROXY_URL + "/proxy?url=" + encodeURIComponent(url), {signal: c.signal}); }
+  finally { clearTimeout(t); outer && outer.removeEventListener("abort", stop); }
+}
 
 /* ---------- State ---------- */
 let tabs = [], activeId = null, nextId = 1;
@@ -118,18 +125,12 @@ const active = () => tabs.find(t => t.id === activeId);
 
 function newTab(input) {
   const t = {id: nextId++, history: [{url: HOME, title: "New tab"}], index: 0, view: {kind: "home"},
-    shown: "", title: "New tab", loading: false, ctrl: null, token: 0, status: {text: "Ready"}, lastAttempt: null, scroll: 0};
+    shown: "", title: "New tab", loading: false, ctrl: null, token: 0, status: {text: "Ready"}, lastAttempt: null};
   tabs.push(t);
   switchTab(t.id);
   if (input) navigate(t, input); else $("#url").focus();
 }
-function switchTab(id) {
-  const cur = active();
-  if (cur) cur.scroll = $("#viewer").scrollTop;
-  activeId = id;
-  paint(true);
-  $("#viewer").scrollTop = active().scroll || 0;
-}
+function switchTab(id) { activeId = id; paint(true); }
 function closeTab(id) {
   const i = tabs.findIndex(t => t.id === id);
   if (i < 0) return;
@@ -157,7 +158,6 @@ function resolveInput(raw) {
   }
   return {url: SEARCH_TEMPLATE.replace("{q}", encodeURIComponent(s)), isSearch: true};
 }
-
 function navigate(tab, input) {
   const r = resolveInput(input);
   if (r.error) return showError(tab, {title: "Can\u2019t open that address", message: r.error, url: input});
@@ -181,6 +181,10 @@ function go(tab, delta) {
   load(tab, e.url, {mode: "go", target: i});
 }
 function reload(tab) {
+  if (tab.loading) { // acts as Stop
+    tab.ctrl?.abort(); tab.token++; tab.loading = false; tab.status = {text: "Stopped"};
+    return paint();
+  }
   if (tab.view.kind === "error" && tab.lastAttempt) return load(tab, tab.lastAttempt.url, tab.lastAttempt.opts);
   const e = tab.history[tab.index];
   if (e.url === HOME) return showHome(tab);
@@ -195,19 +199,17 @@ function showError(tab, d) {
   tab.status = {text: d.message, code: d.code, bad: true};
   if (tab === active()) paint(true);
 }
-
 function explain(code, host, isSearch) {
-  if (isSearch) return "The search provider (" + host + ") could not be reached through your proxy. Its hostname allowlist probably does not include it. Add the host to the allowlist on your server, or change SEARCH_TEMPLATE to a provider the proxy allows.";
+  if (isSearch) return "The search provider (" + host + ") could not be reached through your proxy. Its hostname allowlist probably does not include it. Add the host to the allowlist on your server, or change SEARCH_TEMPLATE.";
   switch (code) {
     case 400: return "The proxy rejected the request. It only accepts valid https:// URLs.";
     case 403: return host + " is probably not on the proxy\u2019s hostname allowlist, or the proxy refused this page\u2019s origin.";
     case 404: return "The page was not found, or the proxy has no /proxy route at this address.";
-    case 429: return "The proxy\u2019s rate limit (30 requests per minute) was reached. Wait a moment and retry.";
+    case 429: return "The proxy\u2019s rate limit was reached. Wait a moment and retry.";
     case 502: case 504: return "The proxy could not get a response from " + host + " (it may be down or slower than the proxy\u2019s 10-second timeout).";
     default: return code >= 500 ? "The proxy or the upstream server reported an error." : "The request was not successful.";
   }
 }
-
 async function load(tab, url, opts) {
   tab.ctrl?.abort();
   const ctrl = new AbortController(), token = ++tab.token, host = hostOf(url);
@@ -220,12 +222,14 @@ async function load(tab, url, opts) {
     const res = await fetch(PROXY_URL + "/proxy?url=" + encodeURIComponent(url), {signal: ctrl.signal});
     const type = res.headers.get("content-type") || "";
     const body = await res.text();
+    clearTimeout(timer);
     if (token !== tab.token) return;
     if (!res.ok) {
       return showError(tab, {title: "HTTP " + res.status, code: res.status, url,
         message: explain(res.status, host, opts.isSearch), detail: body.slice(0, 600)});
     }
-    const view = buildView(url, type, body);
+    const view = await buildView(url, type, body, ctrl.signal);
+    if (token !== tab.token) return;
     const entry = {url, title: view.title};
     if (opts.mode === "push") { tab.history.splice(tab.index + 1); tab.history.push(entry); tab.index++; }
     else if (opts.mode === "go") { tab.index = opts.target; tab.history[tab.index] = entry; }
@@ -235,7 +239,7 @@ async function load(tab, url, opts) {
       code: res.status + " " + (res.statusText || "OK"), ok: true};
     if (tab === active()) paint(true);
   } catch (e) {
-    if (token !== tab.token) return; // superseded by a newer navigation
+    if (token !== tab.token) return; // superseded or stopped
     if (timedOut) showError(tab, {title: "Request timed out", url, message: "No answer from the proxy within " + TIMEOUT_MS / 1000 + " seconds."});
     else showError(tab, {title: "Proxy unreachable", url, message: "Could not reach the proxy. It may be offline, the Cloudflare quick-tunnel URL may have changed since it was restarted, or the proxy refused this page\u2019s origin (CORS).", detail: String(e && e.message || e)});
   } finally {
@@ -245,78 +249,81 @@ async function load(tab, url, opts) {
 }
 
 /* ---------- Content handling ---------- */
-function buildView(url, type, body) {
+async function buildView(url, type, body, signal) {
   const t = type.toLowerCase(), host = hostOf(url);
   if (t.includes("json")) {
     try { return {kind: "json", text: JSON.stringify(JSON.parse(body), null, 2), title: host + new URL(url).pathname}; }
     catch { return {kind: "text", text: body, title: host, note: "invalid JSON shown as text"}; }
   }
-  if (t.includes("html")) return buildHtml(url, body);
+  if (t.includes("html")) return buildPage(url, body, signal);
   if (t === "" || t.startsWith("text/") || t.includes("xml") || t.includes("javascript")) return {kind: "text", text: body, title: host + new URL(url).pathname};
   return {kind: "unsupported", type, title: host, url};
 }
 
-const ALLOWED = new Set("a abbr article aside b blockquote br caption cite code dd del details dfn div dl dt em figcaption figure footer h1 h2 h3 h4 h5 h6 header hr i kbd li main mark nav ol p pre q s samp section small span strong sub summary sup table tbody td tfoot th thead time tr u ul".split(" "));
-const DROPPED = new Set("script style iframe frame frameset object embed noscript template svg math canvas audio video source track form head title link meta select textarea button input base applet".split(" "));
-const MAX_NODES = 40000;
+/* Runs inside the sandboxed frame. Intercepts links, GET forms, window.open and fetch() and hands them to the parent. */
+const SHIM = `(()=>{const P=__P__,pend={};let n=0;const post=m=>parent.postMessage(m,'*');
+const nav=u=>{try{const x=new URL(u,P);/^https?:$/.test(x.protocol)&&post({t:'nav',url:x.href})}catch{}};
+addEventListener('click',e=>{if(e.defaultPrevented)return;const a=e.target.closest&&e.target.closest('a[href]');if(!a)return;const h=a.getAttribute('href');if(h[0]==='#')return;e.preventDefault();nav(h)});
+addEventListener('submit',e=>{if(e.defaultPrevented)return;e.preventDefault();const f=e.target;if((f.getAttribute('method')||'get').toLowerCase()!=='get')return post({t:'msg',text:'POST forms are not supported.'});const u=new URL(f.getAttribute('action')||P,P);for(const [k,v] of new FormData(f))if(typeof v==='string')u.searchParams.set(k,v);nav(u.href)});
+window.open=u=>{u&&nav(u);return null};
+window.fetch=(u,o)=>new Promise((res,rej)=>{const id=++n;pend[id]={res,rej};try{post({t:'fetch',id,url:new URL(u.url||u,P).href})}catch(e){rej(e)}});
+addEventListener('message',e=>{const d=e.data,p=d&&pend[d.id];if(!p)return;delete pend[d.id];d.err?p.rej(new TypeError(d.err)):p.res(new Response(d.body,{status:d.status,headers:{'content-type':d.type}}))});
+})();`;
+const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:";
 
-function safeHref(h, base) {
-  if (!h || h.trim().startsWith("#")) return null;
-  try { const u = new URL(h, base); return (u.protocol === "http:" || u.protocol === "https:") ? u.href : null; } catch { return null; }
+async function buildPage(url, body, signal) {
+  const doc = new DOMParser().parseFromString(body, "text/html"); // inert while parsing
+  const abs = v => { try { const u = new URL(v, url); return u.protocol === "https:" || u.protocol === "http:" ? u.href : null; } catch { return null; } };
+  doc.querySelectorAll("base,iframe,frame,object,embed,noscript,meta[http-equiv],link:not([rel~=stylesheet]),picture source").forEach(n => n.remove());
+  doc.querySelectorAll("a[href],area[href]").forEach(a => {
+    a.removeAttribute("target");
+    const h = a.getAttribute("href");
+    if (h[0] !== "#") { const u = abs(h); if (u) a.setAttribute("href", u); else a.removeAttribute("href"); }
+  });
+  doc.querySelectorAll("img").forEach(i => { i.removeAttribute("srcset"); i.removeAttribute("sizes"); });
+  const jobs = [];
+  doc.querySelectorAll("link[rel~=stylesheet][href]").forEach(n => jobs.push({n, k: "css", u: abs(n.getAttribute("href"))}));
+  doc.querySelectorAll("script[src]").forEach(n => jobs.push({n, k: "js", u: abs(n.getAttribute("src"))}));
+  doc.querySelectorAll("img[src]").forEach(n => { if (!n.getAttribute("src").startsWith("data:")) jobs.push({n, k: "img", u: abs(n.getAttribute("src"))}); });
+  const run = jobs.filter(j => j.u).slice(0, RESOURCE_LIMIT);
+  let ok = 0;
+  const drop = j => j.k === "img" ? j.n.removeAttribute("src") : j.n.remove();
+  jobs.filter(j => !run.includes(j)).forEach(drop);
+  await Promise.all(run.map(async j => {
+    try {
+      const r = await pfetch(j.u, signal);
+      if (!r.ok) throw new Error(r.status);
+      if (j.k === "css") {
+        const s = doc.createElement("style");
+        s.textContent = (await r.text()).replace(/@import[^;]+;/g, "").replace(/<\/style/gi, "<\\/style");
+        j.n.replaceWith(s);
+      } else if (j.k === "js") {
+        const txt = await r.text();
+        for (const a of ["src", "integrity", "crossorigin", "nonce"]) j.n.removeAttribute(a);
+        j.n.textContent = txt.replace(/<\/script/gi, "<\\/script");
+      } else {
+        const buf = await r.arrayBuffer(), mt = (r.headers.get("content-type") || "").split(";")[0];
+        if (!mt.startsWith("image/") || buf.byteLength > MAX_IMAGE_BYTES) throw new Error("skip");
+        const b = new Uint8Array(buf); let s = "";
+        for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
+        j.n.setAttribute("src", "data:" + mt + ";base64," + btoa(s));
+      }
+      ok++;
+    } catch (e) { if (signal.aborted) throw e; drop(j); }
+  }));
+  const shim = doc.createElement("script");
+  shim.textContent = SHIM.replace("__P__", JSON.stringify(url).replace(/</g, "\\u003c"));
+  const csp = doc.createElement("meta");
+  csp.setAttribute("http-equiv", "Content-Security-Policy"); csp.setAttribute("content", CSP);
+  const head = doc.head || doc.documentElement.insertBefore(doc.createElement("head"), doc.body);
+  head.prepend(shim); head.prepend(csp);
+  const skipped = jobs.length - run.length;
+  return {kind: "page", srcdoc: "<!doctype html>" + doc.documentElement.outerHTML, url,
+    title: (doc.title || "").trim().slice(0, 80) || hostOf(url),
+    note: ok + "/" + jobs.length + " resources loaded" + (skipped > 0 ? " (" + skipped + " over limit)" : "")};
 }
-// Copies only allow-listed elements and attributes into new nodes; nothing from upstream is ever inserted as markup.
-function clean(src, out, ctx) {
-  for (const n of src.childNodes) {
-    if (ctx.count++ > MAX_NODES) { ctx.truncated = true; return; }
-    if (n.nodeType === 3) { out.append(n.nodeValue); continue; }
-    if (n.nodeType !== 1) continue;
-    const t = n.localName;
-    if (t === "img" || t === "picture") { ctx.images++; const alt = t === "img" && n.getAttribute("alt"); if (alt) out.append(el("span", {class: "img"}, "[image: " + alt.slice(0, 120) + "]")); continue; }
-    if (DROPPED.has(t)) { ctx.removed++; continue; }
-    if (!ALLOWED.has(t)) { clean(n, out, ctx); continue; } // unknown wrapper (html, body, font, label...): keep its children
-    const e = document.createElement(t);
-    if (t === "a") {
-      const h = safeHref(n.getAttribute("href"), ctx.base);
-      if (h) { e.dataset.href = h; e.tabIndex = 0; e.setAttribute("role", "link"); e.title = h; }
-    }
-    if (t === "td" || t === "th") for (const a of ["colspan", "rowspan"]) { const v = parseInt(n.getAttribute(a), 10); if (v > 0 && v <= 50) e.setAttribute(a, v); }
-    clean(n, e, ctx);
-    out.append(e);
-  }
-}
-function buildHtml(url, body) {
-  const doc = new DOMParser().parseFromString(body, "text/html"); // inert: no scripts run, no resources load
-  const ctx = {base: url, count: 0, images: 0, removed: 0, truncated: false};
-  const article = el("article");
-  clean(doc.body || doc.documentElement, article, ctx);
-  const title = (doc.title || "").trim().slice(0, 80) || hostOf(url);
-  const note = ["removed " + ctx.removed + " script/style/embed elements", ctx.images + " images not loaded", ctx.truncated ? "page truncated" : ""].join(", ");
-  return {kind: "html", node: article, title, note};
-}
-
-const PAGE_CSS = `
-:host{display:block}
-article{font:16px/1.65 system-ui,"Segoe UI",sans-serif;color:#e7e7ea;max-width:80ch;margin:0 auto;padding:24px 20px 72px;overflow-wrap:anywhere}
-h1,h2,h3,h4,h5,h6{line-height:1.25;margin:1.4em 0 .5em}
-a[data-href]{color:#62c4d9;text-decoration:underline;cursor:pointer}
-a[data-href]:focus-visible{outline:2px solid #62c4d9;outline-offset:2px}
-pre,code,kbd,samp{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:#242529;border-radius:4px}
-code{padding:1px 4px}
-pre{padding:12px;overflow:auto;border:1px solid #3a3c43;border-radius:8px}
-pre code{padding:0}
-blockquote{border-left:3px solid #3a3c43;margin:1em 0;padding-left:1em;color:#9b9da6}
-table{border-collapse:collapse;display:block;overflow:auto;max-width:100%}
-td,th{border:1px solid #3a3c43;padding:4px 10px;text-align:left}
-hr{border:0;border-top:1px solid #3a3c43}
-.img{color:#9b9da6;font-style:italic}`;
 
 /* ---------- Views ---------- */
-function onLink(e) {
-  const a = e.target.closest && e.target.closest("[data-href]");
-  if (!a || (e.type === "keydown" && e.key !== "Enter")) return;
-  e.preventDefault();
-  navigate(active(), a.dataset.href);
-}
 const views = {
   home(box) {
     const input = el("input", {id: "hq", type: "text", "aria-label": "Search or enter an address", placeholder: "Search or enter an https:// address"});
@@ -325,12 +332,13 @@ const views = {
       el("p", {class: "sub"}, "Pages load through your own proxy, so only hosts on its allowlist will open."),
       el("form", {class: "hq", autocomplete: "off", onsubmit: e => { e.preventDefault(); navigate(active(), input.value); }}, input, el("button", {type: "submit"}, "Search")),
       el("div", {class: "shortcuts"}, ...SHORTCUTS.map(s => el("button", {type: "button", class: "sc", onclick: () => navigate(active(), s.url)}, el("b", {}, s.label), el("span", {}, s.url.replace("https://", ""))))),
-      el("details", {}, el("summary", {}, "What this browser can and can\u2019t do"),
+      el("details", {}, el("summary", {}, "How pages are rendered, and what won\u2019t work"),
         el("ul", {},
-          el("li", {}, "HTML is parsed, then rebuilt from an allow-list of text, link and table elements inside a closed shadow root."),
-          el("li", {}, "Scripts, site CSS, images, media, forms and embeds are removed, so most modern sites will look plain or incomplete."),
-          el("li", {}, "No cookies, logins or JavaScript-driven pages. Links open through the proxy."),
-          el("li", {}, "Search needs a provider your proxy allows; the default is not on the current allowlist.")))));
+          el("li", {}, "HTML runs in a sandboxed frame with its own isolated origin. It can\u2019t touch this UI, your cookies or storage."),
+          el("li", {}, "CSS, scripts and images are fetched through the proxy and inlined. Only the first " + RESOURCE_LIMIT + " per page are loaded."),
+          el("li", {}, "Page scripts can\u2019t reach the network directly. fetch() GET requests are relayed through the proxy; XMLHttpRequest, WebSockets and POST are not."),
+          el("li", {}, "Anything on a host outside the proxy allowlist is skipped, so large sites (YouTube included) will not work."),
+          el("li", {}, "No cookies or logins. Links and GET forms navigate through the proxy.")))));
     if (!matchMedia("(hover:none)").matches) input.focus();
   },
   json(box, v) {
@@ -350,12 +358,14 @@ const views = {
     box.append(el("div", {class: "doc"}, pre));
   },
   text(box, v) { box.append(el("div", {class: "doc"}, el("pre", {class: "code", textContent: v.text}))); },
-  html(box, v) {
-    const host = el("div"), root = host.attachShadow({mode: "closed"});
-    root.append(el("style", {}, PAGE_CSS), v.node);
-    root.addEventListener("click", onLink);
-    root.addEventListener("keydown", onLink);
-    box.append(host);
+  page(box, v) {
+    // allow-scripts WITHOUT allow-same-origin: scripts run, but in an opaque origin with no access to this page.
+    const fr = el("iframe", {class: "page", sandbox: "allow-scripts", referrerpolicy: "no-referrer", title: v.title, srcdoc: v.srcdoc});
+    let loads = 0;
+    fr.addEventListener("load", () => { // a second load means the page navigated its own frame away from the proxied copy
+      if (++loads > 1) { loads = 0; fr.srcdoc = v.srcdoc; const t = active(); t.status = {text: "Blocked a page script from navigating the frame directly.", bad: true}; paint(); }
+    });
+    box.append(fr);
   },
   unsupported(box, v) {
     box.append(el("section", {class: "err"}, el("h2", {}, "Can\u2019t display this content type"),
@@ -370,10 +380,26 @@ const views = {
   }
 };
 
+/* Messages from the sandboxed frame: only the current frame is trusted, and only for these three requests. */
+addEventListener("message", async e => {
+  const fr = $("#viewer iframe"), t = active();
+  if (!fr || e.source !== fr.contentWindow) return;
+  const d = e.data || {};
+  if (d.t === "nav" && typeof d.url === "string") navigate(t, d.url);
+  else if (d.t === "msg" && typeof d.text === "string") { t.status = {text: d.text.slice(0, 200)}; paint(); }
+  else if (d.t === "fetch" && typeof d.url === "string" && typeof d.id === "number") {
+    try {
+      if (!d.url.startsWith("https://")) throw new Error("Only https:// requests are allowed");
+      const r = await pfetch(d.url, t.ctrl && t.ctrl.signal);
+      const body = await r.arrayBuffer();
+      e.source.postMessage({id: d.id, status: r.status, type: r.headers.get("content-type") || "", body}, "*");
+    } catch (err) { e.source.postMessage({id: d.id, err: "Request failed: " + (err.message || err)}, "*"); }
+  }
+});
+
 /* ---------- Chrome ---------- */
 function paint(viewToo) {
   const t = active();
-  // tabs
   const f = document.activeElement && document.activeElement.dataset.f;
   const strip = $("#tabs");
   strip.replaceChildren(...tabs.map(x => el("div", {class: "tab" + (x.id === activeId ? " on" : ""), role: "presentation"},
@@ -381,12 +407,12 @@ function paint(viewToo) {
     el("button", {class: "x", "aria-label": "Close tab: " + x.title, "data-f": "x" + x.id, onclick: () => closeTab(x.id)}, "\u00d7"))),
     el("button", {class: "nb", id: "newtab", "aria-label": "New tab", title: "New tab", "data-f": "n", onclick: () => newTab()}, "+"));
   if (f) strip.querySelector('[data-f="' + f + '"]')?.focus();
-  // toolbar
   $("#back").disabled = t.index <= 0;
   $("#fwd").disabled = t.index >= t.history.length - 1;
-  $("#reload").classList.toggle("spin", t.loading);
+  const rl = $("#reload");
+  rl.textContent = t.loading ? "\u2715" : "\u21bb";
+  rl.setAttribute("aria-label", t.loading ? "Stop" : "Reload"); rl.title = t.loading ? "Stop" : "Reload";
   $("#bar").classList.toggle("on", t.loading);
-  $("#bar").setAttribute("aria-hidden", !t.loading);
   if (document.activeElement !== $("#url") || viewToo) $("#url").value = t.shown;
   $("#st").textContent = t.status.text || "";
   const c = $("#code");
