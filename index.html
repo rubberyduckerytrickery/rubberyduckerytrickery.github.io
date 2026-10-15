@@ -88,7 +88,8 @@ details ul{padding-left:20px}
 const PROXY_URL = "https://processors-personal-consist-racial.trycloudflare.com"; // no trailing slash
 const SEARCH_TEMPLATE = "https://duckduckgo.com/html/?q={q}"; // {q} = encoded query
 const TIMEOUT_MS = 12000;
-const RESOURCE_LIMIT = 40; // max CSS/JS/image files fetched per page
+const NAV_TIMEOUT_MS = 45000; // a page request now includes the proxy fetching all of its files
+const RESOURCE_LIMIT = 100; // max CSS/JS/image files fetched per page
 const MAX_IMAGE_BYTES = 1500000;
 const HOME = "about:home";
 const SHORTCUTS = [
@@ -152,7 +153,8 @@ function jarStore(res) {
 async function proxyFetch(url, init = {}) {
   const h = new Headers(init.headers || {}), ck = jarHeader(url);
   if (ck) h.set("X-Proxy-Cookie", ck);
-  const r = await fetch(PROXY_URL + "/proxy?url=" + encodeURIComponent(url), {...init, headers: h});
+  const {bundle, ...rest} = init;
+  const r = await fetch(PROXY_URL + (bundle ? "/bundle" : "/proxy") + "?url=" + encodeURIComponent(url), {...rest, headers: h});
   jarStore(r);
   return r;
 }
@@ -261,9 +263,9 @@ async function load(tab, url, opts) {
   tab.status = {text: "Loading " + host + "\u2026"};
   if (tab === active()) paint();
   let timedOut = false;
-  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, TIMEOUT_MS);
+  const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, NAV_TIMEOUT_MS);
   try {
-    const res = await proxyFetch(url, {signal: ctrl.signal, headers: {Accept: NAV_ACCEPT}});
+    const res = await proxyFetch(url, {signal: ctrl.signal, headers: {Accept: NAV_ACCEPT}, bundle: true});
     const type = res.headers.get("content-type") || "";
     const finalUrl = res.headers.get("x-proxy-final-url") || url; // after redirects
     const buf = await res.arrayBuffer();
@@ -276,6 +278,8 @@ async function load(tab, url, opts) {
         message: explain(res.status, host, opts.isSearch), detail: body.slice(0, 600)});
     }
     const view = await buildView(finalUrl, type, body, ctrl.signal);
+    const bundled = res.headers.get("x-proxy-bundled");
+    if (bundled && view.kind === "page") view.note = bundled + " files bundled by proxy";
     if (token !== tab.token) return;
     const entry = {url: finalUrl, title: view.title};
     tab.shown = finalUrl;
@@ -288,7 +292,7 @@ async function load(tab, url, opts) {
     if (tab === active()) paint(true);
   } catch (e) {
     if (token !== tab.token) return; // superseded or stopped
-    if (timedOut) showError(tab, {title: "Request timed out", url, message: "No answer from the proxy within " + TIMEOUT_MS / 1000 + " seconds."});
+    if (timedOut) showError(tab, {title: "Request timed out", url, message: "No answer from the proxy within " + NAV_TIMEOUT_MS / 1000 + " seconds."});
     else showError(tab, {title: "Proxy unreachable", url, message: "Could not reach the proxy. It may be offline, the Cloudflare quick-tunnel URL may have changed since it was restarted, or the proxy refused this page\u2019s origin (CORS).", detail: String(e && e.message || e)});
   } finally {
     clearTimeout(timer);
@@ -309,17 +313,31 @@ async function buildView(url, type, body, signal) {
 }
 
 /* Runs inside the sandboxed frame. Intercepts links, GET forms, window.open and fetch() and hands them to the parent. */
-const SHIM = `(()=>{const P=__P__,pend={};let n=0;const post=m=>parent.postMessage(m,'*');
+const SHIM = `(()=>{const P=__P__,pend={},PAR=parent;let n=0;const post=m=>PAR.postMessage(m,'*');try{Object.defineProperty(window,'parent',{configurable:true,get:()=>window})}catch{}
 try{const c={};Object.defineProperty(Document.prototype,'cookie',{configurable:true,get(){return Object.entries(c).map(([k,v])=>k+'='+v).join('; ')},set(s){const p=String(s).split(';'),i=p[0].indexOf('=');if(i<0)return;const k=p[0].slice(0,i).trim(),v=p[0].slice(i+1).trim(),a=p.slice(1).join(';').toLowerCase(),e=/expires=([^;]+)/.exec(a);if(/max-age=[ ]*(0|-)/.test(a)||(e&&Date.parse(e[1])<Date.now()))delete c[k];else c[k]=v}})}catch{}
 for(const nm of ['localStorage','sessionStorage']){try{const d={};Object.defineProperty(window,nm,{configurable:true,value:{getItem:k=>k in d?d[k]:null,setItem:(k,v)=>{d[k]=String(v)},removeItem:k=>{delete d[k]},clear:()=>{for(const k in d)delete d[k]},key:i=>Object.keys(d)[i]??null,get length(){return Object.keys(d).length}}})}catch{}}
 try{Object.defineProperty(window,'caches',{configurable:true,value:{open:()=>Promise.reject(new Error('Cache storage unavailable')),match:()=>Promise.resolve(undefined),has:()=>Promise.resolve(false),keys:()=>Promise.resolve([]),delete:()=>Promise.resolve(false)}})}catch{}
 try{delete Navigator.prototype.serviceWorker}catch{}
 const nav=u=>{try{const x=new URL(u,P);/^https?:$/.test(x.protocol)&&post({t:'nav',url:x.href})}catch{}};
-addEventListener('click',e=>{if(e.defaultPrevented)return;const a=e.target.closest&&e.target.closest('a[href]');if(!a)return;const h=a.getAttribute('href');if(h[0]==='#')return;e.preventDefault();nav(h)});
+addEventListener('click',e=>{if(e.defaultPrevented)return;const a=e.target.closest&&e.target.closest('a[href]');if(!a)return;const h=a.getAttribute('href');e.preventDefault();if(h[0]==='#'){let id=h.slice(1);try{id=decodeURIComponent(id)}catch{}const t=id&&(document.getElementById(id)||document.getElementsByName(id)[0]);if(t)t.scrollIntoView();else if(!id)scrollTo(0,0);return}nav(h)});
 addEventListener('submit',e=>{if(e.defaultPrevented)return;e.preventDefault();const f=e.target;if((f.getAttribute('method')||'get').toLowerCase()!=='get')return post({t:'msg',text:'POST forms are not supported.'});const u=new URL(f.getAttribute('action')||P,P);for(const [k,v] of new FormData(f))if(typeof v==='string')u.searchParams.set(k,v);nav(u.href)});
 window.open=u=>{u&&nav(u);return null};
-window.fetch=(u,o)=>new Promise((res,rej)=>{const id=++n;pend[id]={res,rej};try{o=o||{};const h={};new Headers(o.headers||u.headers||{}).forEach((v,k)=>h[k]=v);post({t:'fetch',id,url:new URL(u.url||u,P).href,method:o.method||u.method||'GET',headers:h,body:typeof o.body==='string'?o.body:undefined})}catch(e){rej(e)}});
+window.fetch=(u,o)=>new Promise((res,rej)=>{const id=++n;pend[id]={res,rej};try{o=o||{};const h={};new Headers(o.headers||u.headers||{}).forEach((v,k)=>h[k]=v);post({t:'fetch',id,url:new URL(u.url||u,P).href,method:o.method||u.method||'GET',headers:h,body:typeof o.body==='string'?o.body:o.body instanceof URLSearchParams?String(o.body):undefined})}catch(e){rej(e)}});
 addEventListener('message',e=>{const d=e.data,p=d&&pend[d.id];if(!p)return;delete pend[d.id];d.err?p.rej(new TypeError(d.err)):p.res(new Response([101,204,205,304].includes(d.status)?null:d.body,{status:d.status,headers:{'content-type':d.type}}))});
+function X(){this.readyState=0;this.status=0;this.statusText='';this.responseText='';this.response=null;this.responseType='';this.timeout=0;this.withCredentials=false;this.upload={addEventListener(){}};this._h={};this._l={}}
+X.UNSENT=0;X.OPENED=1;X.HEADERS_RECEIVED=2;X.LOADING=3;X.DONE=4;
+Object.assign(X.prototype,{
+open(m,u){this._m=m;this._u=String(u);this._a=0;this.readyState=1;this._f('readystatechange')},
+setRequestHeader(k,v){this._h[k]=v},overrideMimeType(){},
+addEventListener(t,f){(this._l[t]=this._l[t]||[]).push(f)},
+removeEventListener(t,f){this._l[t]=(this._l[t]||[]).filter(x=>x!==f)},
+_f(t){const e={type:t,target:this,currentTarget:this},h=this['on'+t];h&&h.call(this,e);(this._l[t]||[]).forEach(f=>f.call(this,e))},
+getResponseHeader(k){return this._rh?this._rh[String(k).toLowerCase()]??null:null},
+getAllResponseHeaders(){return this._rh?Object.entries(this._rh).map(([k,v])=>k+': '+v).join(String.fromCharCode(13,10)):''},
+abort(){this._a=1;this.readyState=0;this._f('abort')},
+send(b){const x=this;fetch(x._u,{method:x._m,headers:x._h,body:typeof b==='string'?b:b instanceof URLSearchParams?String(b):undefined}).then(async r=>{if(x._a)return;x.status=r.status;x.statusText=r.statusText||'';x._rh={'content-type':r.headers.get('content-type')||''};x.readyState=2;x._f('readystatechange');const t=x.responseType;if(t==='arraybuffer')x.response=await r.arrayBuffer();else if(t==='blob')x.response=await r.blob();else{x.responseText=await r.text();let j=x.responseText;if(t==='json'){try{j=JSON.parse(j)}catch{j=null}}x.response=j}x.readyState=4;x._f('readystatechange');x._f('load');x._f('loadend')}).catch(()=>{if(x._a)return;x.readyState=4;x.status=0;x._f('readystatechange');x._f('error');x._f('loadend')})}
+});
+window.XMLHttpRequest=X;
 })();`;
 // false: pages can only use images/fonts this browser inlined itself (private; dynamically added images stay blank).
 // true: pages may load images and fonts straight from their own sites (thumbnails appear, but those sites see your IP).
@@ -338,12 +356,12 @@ async function buildPage(url, body, signal) {
   doc.querySelectorAll("img").forEach(i => { i.removeAttribute("srcset"); i.removeAttribute("sizes"); });
   const jobs = [];
   doc.querySelectorAll("link[rel~=stylesheet][href]").forEach(n => jobs.push({n, k: "css", u: abs(n.getAttribute("href"))}));
-  doc.querySelectorAll("script[src]").forEach(n => jobs.push({n, k: "js", u: abs(n.getAttribute("src"))}));
+  doc.querySelectorAll("script[src]").forEach(n => jobs.push({n, k: "js", u: abs(n.getAttribute("src")), defer: n.hasAttribute("defer") && n.type !== "module"}));
   doc.querySelectorAll("img[src]").forEach(n => { if (!n.getAttribute("src").startsWith("data:")) jobs.push({n, k: "img", u: abs(n.getAttribute("src"))}); });
   const run = jobs.filter(j => j.u).slice(0, RESOURCE_LIMIT);
   let ok = 0;
   const drop = j => j.k === "img" ? j.n.removeAttribute("src") : j.n.remove();
-  jobs.filter(j => !run.includes(j)).forEach(drop);
+  jobs.filter(j => !run.includes(j)).forEach(j => { console.warn("[proxy-browser] not loaded:", j.k, j.u || "(unsupported URL)"); drop(j); });
   await Promise.all(run.map(async j => {
     try {
       const r = await pfetch(j.u, signal, undefined, {headers: {Accept: ACC[j.k]}});
@@ -371,7 +389,8 @@ async function buildPage(url, body, signal) {
   const csp = doc.createElement("meta");
   csp.setAttribute("http-equiv", "Content-Security-Policy"); csp.setAttribute("content", CSP);
   const head = doc.head || doc.documentElement.insertBefore(doc.createElement("head"), doc.body);
-  head.prepend(shim); head.prepend(csp);
+  const base = doc.createElement("base"); base.setAttribute("href", url);
+  head.prepend(shim); head.prepend(base); head.prepend(csp);
   const skipped = jobs.length - run.length;
   return {kind: "page", srcdoc: "<!doctype html>" + doc.documentElement.outerHTML, url,
     title: (doc.title || "").trim().slice(0, 80) || hostOf(url),
@@ -457,7 +476,7 @@ addEventListener("message", async e => {
       const m = String(d.method || "GET").toUpperCase();
       if (!["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].includes(m)) throw new Error("Method not allowed");
       const headers = {};
-      for (const k of ["content-type", "accept", "authorization", "x-requested-with"]) if (d.headers && typeof d.headers[k] === "string") headers[k] = d.headers[k];
+      for (const [k, v] of Object.entries(d.headers || {}).slice(0, 40)) if (typeof v === "string" && v.length < 4000 && /^[\w-]+$/.test(k) && !/^(cookie|host|origin|referer|user-agent|x-proxy-.*)$/i.test(k)) headers[k] = v;
       const r = await pfetch(d.url, t.ctrl && t.ctrl.signal, undefined, {method: m, headers, body: m === "GET" || m === "HEAD" || typeof d.body !== "string" ? undefined : d.body});
       const body = await r.arrayBuffer();
       e.source.postMessage({id: d.id, status: r.status, type: r.headers.get("content-type") || "", body}, "*");
