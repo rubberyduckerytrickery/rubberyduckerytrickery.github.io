@@ -88,7 +88,7 @@ details ul{padding-left:20px}
 const PROXY_URL = "https://processors-personal-consist-racial.trycloudflare.com"; // no trailing slash
 const SEARCH_TEMPLATE = "https://duckduckgo.com/html/?q={q}"; // {q} = encoded query
 const TIMEOUT_MS = 12000;
-const RESOURCE_LIMIT = 12; // max CSS/JS/image files fetched per page (your proxy allows 30 requests/minute)
+const RESOURCE_LIMIT = 40; // max CSS/JS/image files fetched per page
 const MAX_IMAGE_BYTES = 1500000;
 const HOME = "about:home";
 const SHORTCUTS = [
@@ -112,10 +112,54 @@ function el(tag, props = {}, ...kids) {
 }
 const hostOf = u => { try { return new URL(u).host; } catch { return u; } };
 const kb = n => n < 1024 ? n + " B" : (n / 1024).toFixed(1) + " KB";
-async function pfetch(url, outer, ms = TIMEOUT_MS) { // every network request goes through here
+const NAV_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7";
+const ACC = {css: "text/css,*/*;q=0.1", js: "*/*", img: "image/webp,image/png,image/jpeg,image/*,*/*;q=0.8"};
+
+/* Cookie jar kept in this browser's localStorage. The proxy returns Set-Cookie in X-Proxy-Set-Cookie and we send matches back in X-Proxy-Cookie. */
+const JAR_KEY = "proxyBrowserCookies";
+let jar = [];
+try { jar = JSON.parse(localStorage.getItem(JAR_KEY) || "[]"); } catch { jar = []; }
+function jarSave() { try { localStorage.setItem(JAR_KEY, JSON.stringify(jar.slice(-300))); } catch { /* storage unavailable */ } }
+function jarHeader(url) {
+  const u = new URL(url), now = Date.now();
+  return jar.filter(c => (!c.exp || c.exp > now) && u.pathname.startsWith(c.path) &&
+    (c.dom ? (u.hostname === c.dom || u.hostname.endsWith("." + c.dom)) : u.hostname === c.host))
+    .map(c => c.name + "=" + c.value).join("; ");
+}
+function jarStore(res) {
+  const raw = res.headers.get("x-proxy-set-cookie");
+  if (!raw) return;
+  let list;
+  try { list = JSON.parse(decodeURIComponent(raw)); } catch { return; }
+  const now = Date.now();
+  for (const {u, c} of list) {
+    const [nv, ...attrs] = c.split(";").map(s => s.trim()), i = nv.indexOf("=");
+    if (i < 1) continue;
+    const ck = {name: nv.slice(0, i), value: nv.slice(i + 1), host: new URL(u).hostname, dom: "", path: "/", exp: 0};
+    for (const a of attrs) {
+      const [k, ...v] = a.split("="), val = v.join("="), kl = k.toLowerCase();
+      if (kl === "domain") ck.dom = val.replace(/^\./, "").toLowerCase();
+      else if (kl === "path" && val[0] === "/") ck.path = val;
+      else if (kl === "max-age") ck.exp = now + parseInt(val, 10) * 1000;
+      else if (kl === "expires" && !ck.exp) { const t = Date.parse(val); if (!isNaN(t)) ck.exp = t; }
+    }
+    if (ck.dom && ck.host !== ck.dom && !ck.host.endsWith("." + ck.dom)) continue; // a site can't set cookies for unrelated domains
+    jar = jar.filter(o => !(o.name === ck.name && o.host === ck.host && o.dom === ck.dom && o.path === ck.path));
+    if (!ck.exp || ck.exp > now) jar.push(ck); // an already-expired cookie means "delete"
+  }
+  jarSave();
+}
+async function proxyFetch(url, init = {}) {
+  const h = new Headers(init.headers || {}), ck = jarHeader(url);
+  if (ck) h.set("X-Proxy-Cookie", ck);
+  const r = await fetch(PROXY_URL + "/proxy?url=" + encodeURIComponent(url), {...init, headers: h});
+  jarStore(r);
+  return r;
+}
+async function pfetch(url, outer, ms = TIMEOUT_MS, init = {}) { // every sub-request goes through here
   const c = new AbortController(), stop = () => c.abort(), t = setTimeout(stop, ms);
   outer && outer.addEventListener("abort", stop);
-  try { return await fetch(PROXY_URL + "/proxy?url=" + encodeURIComponent(url), {signal: c.signal}); }
+  try { return await proxyFetch(url, {...init, signal: c.signal}); }
   finally { clearTimeout(t); outer && outer.removeEventListener("abort", stop); }
 }
 
@@ -203,7 +247,7 @@ function explain(code, host, isSearch) {
   if (isSearch) return "The search provider (" + host + ") could not be reached through your proxy. Its hostname allowlist probably does not include it. Add the host to the allowlist on your server, or change SEARCH_TEMPLATE.";
   switch (code) {
     case 400: return "The proxy rejected the request. It only accepts valid https:// URLs.";
-    case 403: return host + " is probably not on the proxy\u2019s hostname allowlist, or the proxy refused this page\u2019s origin.";
+    case 403: return "The proxy refused this request: the address is private or local, the site blocked the proxy, or this page\u2019s origin isn\u2019t allowed. See the details below.";
     case 404: return "The page was not found, or the proxy has no /proxy route at this address.";
     case 429: return "The proxy\u2019s rate limit was reached. Wait a moment and retry.";
     case 502: case 504: return "The proxy could not get a response from " + host + " (it may be down or slower than the proxy\u2019s 10-second timeout).";
@@ -219,18 +263,22 @@ async function load(tab, url, opts) {
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, TIMEOUT_MS);
   try {
-    const res = await fetch(PROXY_URL + "/proxy?url=" + encodeURIComponent(url), {signal: ctrl.signal});
+    const res = await proxyFetch(url, {signal: ctrl.signal, headers: {Accept: NAV_ACCEPT}});
     const type = res.headers.get("content-type") || "";
-    const body = await res.text();
+    const finalUrl = res.headers.get("x-proxy-final-url") || url; // after redirects
+    const buf = await res.arrayBuffer();
+    let body;
+    try { body = new TextDecoder((/charset=([\w-]+)/i.exec(type) || [])[1] || "utf-8").decode(buf); } catch { body = new TextDecoder().decode(buf); }
     clearTimeout(timer);
     if (token !== tab.token) return;
     if (!res.ok) {
       return showError(tab, {title: "HTTP " + res.status, code: res.status, url,
         message: explain(res.status, host, opts.isSearch), detail: body.slice(0, 600)});
     }
-    const view = await buildView(url, type, body, ctrl.signal);
+    const view = await buildView(finalUrl, type, body, ctrl.signal);
     if (token !== tab.token) return;
-    const entry = {url, title: view.title};
+    const entry = {url: finalUrl, title: view.title};
+    tab.shown = finalUrl;
     if (opts.mode === "push") { tab.history.splice(tab.index + 1); tab.history.push(entry); tab.index++; }
     else if (opts.mode === "go") { tab.index = opts.target; tab.history[tab.index] = entry; }
     else tab.history[tab.index] = entry;
@@ -266,8 +314,8 @@ const nav=u=>{try{const x=new URL(u,P);/^https?:$/.test(x.protocol)&&post({t:'na
 addEventListener('click',e=>{if(e.defaultPrevented)return;const a=e.target.closest&&e.target.closest('a[href]');if(!a)return;const h=a.getAttribute('href');if(h[0]==='#')return;e.preventDefault();nav(h)});
 addEventListener('submit',e=>{if(e.defaultPrevented)return;e.preventDefault();const f=e.target;if((f.getAttribute('method')||'get').toLowerCase()!=='get')return post({t:'msg',text:'POST forms are not supported.'});const u=new URL(f.getAttribute('action')||P,P);for(const [k,v] of new FormData(f))if(typeof v==='string')u.searchParams.set(k,v);nav(u.href)});
 window.open=u=>{u&&nav(u);return null};
-window.fetch=(u,o)=>new Promise((res,rej)=>{const id=++n;pend[id]={res,rej};try{post({t:'fetch',id,url:new URL(u.url||u,P).href})}catch(e){rej(e)}});
-addEventListener('message',e=>{const d=e.data,p=d&&pend[d.id];if(!p)return;delete pend[d.id];d.err?p.rej(new TypeError(d.err)):p.res(new Response(d.body,{status:d.status,headers:{'content-type':d.type}}))});
+window.fetch=(u,o)=>new Promise((res,rej)=>{const id=++n;pend[id]={res,rej};try{o=o||{};const h={};new Headers(o.headers||u.headers||{}).forEach((v,k)=>h[k]=v);post({t:'fetch',id,url:new URL(u.url||u,P).href,method:o.method||u.method||'GET',headers:h,body:typeof o.body==='string'?o.body:undefined})}catch(e){rej(e)}});
+addEventListener('message',e=>{const d=e.data,p=d&&pend[d.id];if(!p)return;delete pend[d.id];d.err?p.rej(new TypeError(d.err)):p.res(new Response([101,204,205,304].includes(d.status)?null:d.body,{status:d.status,headers:{'content-type':d.type}}))});
 })();`;
 const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:";
 
@@ -291,7 +339,7 @@ async function buildPage(url, body, signal) {
   jobs.filter(j => !run.includes(j)).forEach(drop);
   await Promise.all(run.map(async j => {
     try {
-      const r = await pfetch(j.u, signal);
+      const r = await pfetch(j.u, signal, undefined, {headers: {Accept: ACC[j.k]}});
       if (!r.ok) throw new Error(r.status);
       if (j.k === "css") {
         const s = doc.createElement("style");
@@ -329,16 +377,16 @@ const views = {
     const input = el("input", {id: "hq", type: "text", "aria-label": "Search or enter an address", placeholder: "Search or enter an https:// address"});
     box.append(el("section", {class: "home"},
       el("h1", {}, "Proxy Browser"),
-      el("p", {class: "sub"}, "Pages load through your own proxy, so only hosts on its allowlist will open."),
+      el("p", {class: "sub"}, "Every page and file loads through your own proxy."),
       el("form", {class: "hq", autocomplete: "off", onsubmit: e => { e.preventDefault(); navigate(active(), input.value); }}, input, el("button", {type: "submit"}, "Search")),
       el("div", {class: "shortcuts"}, ...SHORTCUTS.map(s => el("button", {type: "button", class: "sc", onclick: () => navigate(active(), s.url)}, el("b", {}, s.label), el("span", {}, s.url.replace("https://", ""))))),
       el("details", {}, el("summary", {}, "How pages are rendered, and what won\u2019t work"),
         el("ul", {},
           el("li", {}, "HTML runs in a sandboxed frame with its own isolated origin. It can\u2019t touch this UI, your cookies or storage."),
           el("li", {}, "CSS, scripts and images are fetched through the proxy and inlined. Only the first " + RESOURCE_LIMIT + " per page are loaded."),
-          el("li", {}, "Page scripts can\u2019t reach the network directly. fetch() GET requests are relayed through the proxy; XMLHttpRequest, WebSockets and POST are not."),
-          el("li", {}, "Anything on a host outside the proxy allowlist is skipped, so large sites (YouTube included) will not work."),
-          el("li", {}, "No cookies or logins. Links and GET forms navigate through the proxy.")))));
+          el("li", {}, "Page scripts can\u2019t reach the network directly. fetch() calls (text bodies only) are relayed through the proxy; XMLHttpRequest, WebSockets and streaming are not."),
+          el("li", {}, "Script-heavy sites that rely on XMLHttpRequest, WebSockets, video streaming or document.cookie, such as YouTube, will still be incomplete or broken."),
+          el("li", {}, "Cookies that sites set are kept in this browser\u2019s localStorage and sent back through the proxy. Page scripts can\u2019t read or set them. Links and GET forms navigate through the proxy.")))));
     if (!matchMedia("(hover:none)").matches) input.focus();
   },
   json(box, v) {
@@ -390,7 +438,11 @@ addEventListener("message", async e => {
   else if (d.t === "fetch" && typeof d.url === "string" && typeof d.id === "number") {
     try {
       if (!d.url.startsWith("https://")) throw new Error("Only https:// requests are allowed");
-      const r = await pfetch(d.url, t.ctrl && t.ctrl.signal);
+      const m = String(d.method || "GET").toUpperCase();
+      if (!["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].includes(m)) throw new Error("Method not allowed");
+      const headers = {};
+      for (const k of ["content-type", "accept", "authorization", "x-requested-with"]) if (d.headers && typeof d.headers[k] === "string") headers[k] = d.headers[k];
+      const r = await pfetch(d.url, t.ctrl && t.ctrl.signal, undefined, {method: m, headers, body: m === "GET" || m === "HEAD" || typeof d.body !== "string" ? undefined : d.body});
       const body = await r.arrayBuffer();
       e.source.postMessage({id: d.id, status: r.status, type: r.headers.get("content-type") || "", body}, "*");
     } catch (err) { e.source.postMessage({id: d.id, err: "Request failed: " + (err.message || err)}, "*"); }
