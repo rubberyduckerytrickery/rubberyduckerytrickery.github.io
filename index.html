@@ -310,6 +310,8 @@ async function buildView(url, type, body, signal) {
 
 /* Runs inside the sandboxed frame. Intercepts links, GET forms, window.open and fetch() and hands them to the parent. */
 const SHIM = `(()=>{const P=__P__,pend={};let n=0;const post=m=>parent.postMessage(m,'*');
+try{const c={};Object.defineProperty(Document.prototype,'cookie',{configurable:true,get(){return Object.entries(c).map(([k,v])=>k+'='+v).join('; ')},set(s){const p=String(s).split(';'),i=p[0].indexOf('=');if(i<0)return;const k=p[0].slice(0,i).trim(),v=p[0].slice(i+1).trim(),a=p.slice(1).join(';').toLowerCase(),e=/expires=([^;]+)/.exec(a);if(/max-age=[ ]*(0|-)/.test(a)||(e&&Date.parse(e[1])<Date.now()))delete c[k];else c[k]=v}})}catch{}
+for(const nm of ['localStorage','sessionStorage']){try{const d={};Object.defineProperty(window,nm,{configurable:true,value:{getItem:k=>k in d?d[k]:null,setItem:(k,v)=>{d[k]=String(v)},removeItem:k=>{delete d[k]},clear:()=>{for(const k in d)delete d[k]},key:i=>Object.keys(d)[i]??null,get length(){return Object.keys(d).length}}})}catch{}}
 const nav=u=>{try{const x=new URL(u,P);/^https?:$/.test(x.protocol)&&post({t:'nav',url:x.href})}catch{}};
 addEventListener('click',e=>{if(e.defaultPrevented)return;const a=e.target.closest&&e.target.closest('a[href]');if(!a)return;const h=a.getAttribute('href');if(h[0]==='#')return;e.preventDefault();nav(h)});
 addEventListener('submit',e=>{if(e.defaultPrevented)return;e.preventDefault();const f=e.target;if((f.getAttribute('method')||'get').toLowerCase()!=='get')return post({t:'msg',text:'POST forms are not supported.'});const u=new URL(f.getAttribute('action')||P,P);for(const [k,v] of new FormData(f))if(typeof v==='string')u.searchParams.set(k,v);nav(u.href)});
