@@ -62,23 +62,127 @@ details ul{padding-left:20px}
 .err .btns{display:flex;gap:8px;margin-top:14px}
 .err .btns button{padding:7px 16px;border-radius:8px;border:1px solid var(--line);background:var(--raise)}
 @media (max-width:640px){#home{display:none}.tab{min-width:90px}#gobtn{padding:0 12px}}
+/* ---------- refreshed theme (overrides above) ---------- */
+:root{--bg:#121316;--surf:#1a1b1f;--raise:#24262c;--line:#2b2d34;--text:#e9eaee;--mute:#8e919b;--acc:#7aa7ff;--ok:#5fd39a;--bad:#ff7d6e;--r:12px}
+body{font:14px/1.45 Inter,"Segoe UI",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#33353d;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+#tabs{background:var(--bg);padding:8px 10px 0;gap:4px}
+.tab{min-width:120px;border:0;border-radius:10px 10px 0 0}
+.tab:hover{background:#17181c}
+.tab.on{background:var(--surf)}
+.tab .t{padding-left:8px}
+.fav{flex:none;width:18px;height:18px;margin-left:10px;border-radius:50%;background:var(--raise);color:var(--acc);font-size:10px;font-weight:700;display:grid;place-items:center}
+.tab.ld .fav{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
+#newtab{border-radius:8px}
+#toolbar{padding:8px 10px;gap:4px;border:0;background:var(--surf)}
+.nb{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;padding:0}
+.nb svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nb svg circle{fill:currentColor;stroke:none}
+.nb[aria-pressed=true]{background:var(--raise);color:var(--acc)}
+.nb.sm{width:28px;height:28px;font-size:16px}
+#go{background:var(--bg);border:1px solid var(--line);border-radius:20px;height:38px;padding:0 4px 0 12px;align-items:center;gap:8px;margin:0 4px;transition:border-color .15s,box-shadow .15s}
+#go:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px rgba(122,167,255,.18)}
+#go .lock{width:15px;height:15px;stroke:var(--mute);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#url{height:36px;padding:0;background:none;border:0;border-radius:0}
+#url:focus{outline:none}
+#gobtn{width:30px;height:30px;padding:0;border-radius:50%;display:grid;place-items:center;background:var(--acc);color:#0b1220}
+#gobtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#bar.on::after{background:var(--acc)}
+#work{flex:1;min-height:0;display:flex;flex-direction:column}
+#status{background:var(--surf);border-top:1px solid var(--line);padding:5px 14px}
+.home{max-width:720px;padding:12vh 24px 48px}
+.home h1{font-size:34px;font-weight:700;letter-spacing:-.03em}
+.hq input{height:50px;border-radius:26px;padding:0 22px;font-size:15px}
+.hq button{border-radius:26px;background:var(--acc);color:#0b1220}
+.sc{padding:14px 16px;border-radius:var(--r);transition:transform .12s,border-color .12s,background .12s}
+.sc:hover{background:var(--raise);transform:translateY(-1px)}
+.sc b{font-weight:600}
+.err{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:600px}
+#dev{flex:none;height:var(--devh,300px);display:flex;flex-direction:column;background:var(--surf);border-top:1px solid var(--line);min-height:0}
+#dev[hidden],.pane[hidden],#ctx[hidden]{display:none}
+#devgrip{height:7px;margin-top:-4px;cursor:ns-resize;flex:none;position:relative;z-index:2}
+#devgrip:hover,#devgrip:focus-visible{background:var(--acc);opacity:.5}
+#devhead{display:flex;align-items:center;gap:8px;padding:0 8px 0 4px;border-bottom:1px solid var(--line);flex:none}
+#devtabs{display:flex}
+#devtabs button{background:none;border:0;padding:8px 12px;color:var(--mute);border-bottom:2px solid transparent}
+#devtabs button[aria-selected=true]{color:var(--text);border-color:var(--acc)}
+#devinfo{flex:1;color:var(--mute);font-size:12px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pane{flex:1;min-height:0;display:flex;flex-direction:column}
+#conout,#domwrap,#netwrap{flex:1;overflow:auto;font:12.5px/1.5 ui-monospace,Consolas,monospace}
+.ln{display:flex;gap:8px;padding:3px 12px;border-bottom:1px solid #202228}
+.ln pre{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;flex:1}
+.ln .gl{width:12px;color:var(--mute);flex:none;text-align:center}
+.ln.warn{background:rgba(255,200,60,.08);color:#ffd479}
+.ln.error{background:rgba(255,125,110,.09);color:var(--bad)}
+.ln.info .gl{color:var(--acc)}
+.ln.result pre{color:#9fe2bf}
+.empty{padding:14px;color:var(--mute);font:13px system-ui,sans-serif}
+#conform{display:flex;gap:8px;align-items:flex-start;padding:6px 12px;border-top:1px solid var(--line);flex:none}
+#conform span{color:var(--acc);font:14px ui-monospace,monospace;padding-top:3px}
+#conin{flex:1;resize:none;background:none;border:0;color:var(--text);font:12.5px/1.5 ui-monospace,Consolas,monospace;outline:none;max-height:120px}
+.panebar{display:flex;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);flex:none}
+.panebar button{padding:4px 12px;border-radius:8px;border:1px solid var(--line);background:var(--raise)}
+#domwrap pre{margin:0;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
+#domsel{border-bottom:1px solid var(--line);color:#c3e88d}
+.tbl{width:100%;border-collapse:collapse;font:12px ui-monospace,Consolas,monospace}
+.tbl th{position:sticky;top:0;background:var(--raise);text-align:left;padding:5px 10px;font-weight:600;color:var(--mute)}
+.tbl td{padding:4px 10px;border-bottom:1px solid #202228;white-space:nowrap;max-width:420px;overflow:hidden;text-overflow:ellipsis}
+.tbl td.ok{color:var(--ok)}.tbl td.bad{color:var(--bad)}
+#ctx{position:fixed;z-index:100;min-width:230px;padding:6px;background:#1f2025;border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+#ctx button{display:flex;justify-content:space-between;gap:24px;width:100%;padding:7px 10px;background:none;border:0;border-radius:8px;text-align:left}
+#ctx button:hover:not(:disabled),#ctx button:focus-visible{background:var(--raise);outline:none}
+#ctx button:disabled{color:#5b5e69;cursor:default}
+#ctx kbd{font:11px system-ui,sans-serif;color:var(--mute)}
+#ctx hr{border:0;border-top:1px solid var(--line);margin:5px 4px}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="tabs" role="tablist" aria-label="Tabs"></div>
   <div id="toolbar">
-    <button class="nb" id="back" aria-label="Back" title="Back (Alt+Left)">&#8592;</button>
-    <button class="nb" id="fwd" aria-label="Forward" title="Forward (Alt+Right)">&#8594;</button>
-    <button class="nb" id="reload" aria-label="Reload" title="Reload">&#8635;</button>
-    <button class="nb" id="home" aria-label="Home" title="Home">&#8962;</button>
+    <button class="nb" id="back" aria-label="Back" title="Back (Alt+Left)"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button class="nb" id="fwd" aria-label="Forward" title="Forward (Alt+Right)"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    <button class="nb" id="reload" aria-label="Reload" title="Reload"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg></button>
+    <button class="nb" id="home" aria-label="Home" title="Home"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7M6 10v9h12v-9"/></svg></button>
     <form id="go" autocomplete="off">
-      <input id="url" type="text" aria-label="Address or search" placeholder="Enter an https:// address or search (Ctrl+L)" spellcheck="false">
-      <button id="gobtn" type="submit">Go</button>
+      <svg class="lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z"/></svg>
+      <input id="url" type="text" aria-label="Address or search" placeholder="Search or enter an https:// address" spellcheck="false">
+      <button id="gobtn" type="submit" aria-label="Go"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </form>
+    <button class="nb" id="devbtn" aria-label="Developer tools" aria-pressed="false" title="Developer tools (F12)"><svg viewBox="0 0 24 24"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg></button>
+    <button class="nb" id="menubtn" aria-label="Menu" aria-haspopup="menu" title="Menu"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg></button>
   </div>
   <div id="bar" role="progressbar" aria-label="Loading"></div>
-  <main id="viewer" tabindex="-1"></main>
+  <div id="work">
+    <main id="viewer" tabindex="-1"></main>
+    <section id="dev" hidden aria-label="Developer tools">
+      <div id="devgrip" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize developer tools"></div>
+      <div id="devhead">
+        <div id="devtabs" role="tablist">
+          <button role="tab" data-tab="console">Console</button>
+          <button role="tab" data-tab="elements">Elements</button>
+          <button role="tab" data-tab="network">Network</button>
+        </div>
+        <span id="devinfo"></span>
+        <button class="nb sm" id="devclear" aria-label="Clear" title="Clear">&#8856;</button>
+        <button class="nb sm" id="devclose" aria-label="Close developer tools" title="Close">&#215;</button>
+      </div>
+      <div id="pane-console" class="pane">
+        <div id="conout" aria-live="polite"></div>
+        <form id="conform"><span aria-hidden="true">&#8250;</span><textarea id="conin" rows="1" spellcheck="false" aria-label="Run JavaScript on this page" placeholder="Run JavaScript on this page (Enter to run, Shift+Enter for a new line)"></textarea></form>
+      </div>
+      <div id="pane-elements" class="pane" hidden>
+        <div class="panebar"><button type="button" id="domrefresh">Refresh</button></div>
+        <div id="domwrap"><pre id="domsel"></pre><pre id="domhtml"></pre></div>
+      </div>
+      <div id="pane-network" class="pane" hidden>
+        <div id="netwrap"><table class="tbl"><thead><tr><th>Status</th><th>Method</th><th>URL</th><th>Type</th><th>Size</th><th>Time</th></tr></thead><tbody id="netbody"></tbody></table></div>
+      </div>
+    </section>
+    <div id="ctx" role="menu" hidden></div>
+  </div>
   <footer id="status" aria-live="polite"><span id="st"></span><span id="code"></span></footer>
 </div>
 <noscript>This browser UI needs JavaScript.</noscript>
@@ -171,7 +275,7 @@ const active = () => tabs.find(t => t.id === activeId);
 
 function newTab(input) {
   const t = {id: nextId++, history: [{url: HOME, title: "New tab"}], index: 0, view: {kind: "home"},
-    shown: "", title: "New tab", loading: false, ctrl: null, token: 0, status: {text: "Ready"}, lastAttempt: null};
+    shown: "", title: "New tab", loading: false, ctrl: null, token: 0, status: {text: "Ready"}, lastAttempt: null, dev: {logs: [], net: [], sel: null, dom: ""}};
   tabs.push(t);
   switchTab(t.id);
   if (input) navigate(t, input); else $("#url").focus();
@@ -287,6 +391,7 @@ async function load(tab, url, opts) {
     else if (opts.mode === "go") { tab.index = opts.target; tab.history[tab.index] = entry; }
     else tab.history[tab.index] = entry;
     tab.view = view; tab.title = view.title; tab.lastAttempt = null;
+    tab.dev = {logs: [], net: [{method: "GET", url: finalUrl, status: res.status, type, bytes: buf.byteLength, ms: null}], sel: null, dom: ""};
     tab.status = {text: [host, type.split(";")[0] || "unknown type", kb(body.length), view.note, opts.upgraded ? "upgraded from http" : ""].filter(Boolean).join(" \u2013 "),
       code: res.status + " " + (res.statusText || "OK"), ok: true};
     if (tab === active()) paint(true);
@@ -338,11 +443,26 @@ abort(){this._a=1;this.readyState=0;this._f('abort')},
 send(b){const x=this;fetch(x._u,{method:x._m,headers:x._h,body:typeof b==='string'?b:b instanceof URLSearchParams?String(b):undefined}).then(async r=>{if(x._a)return;x.status=r.status;x.statusText=r.statusText||'';x._rh={'content-type':r.headers.get('content-type')||''};x.readyState=2;x._f('readystatechange');const t=x.responseType;if(t==='arraybuffer')x.response=await r.arrayBuffer();else if(t==='blob')x.response=await r.blob();else{x.responseText=await r.text();let j=x.responseText;if(t==='json'){try{j=JSON.parse(j)}catch{j=null}}x.response=j}x.readyState=4;x._f('readystatechange');x._f('load');x._f('loadend')}).catch(()=>{if(x._a)return;x.readyState=4;x.status=0;x._f('readystatechange');x._f('error');x._f('loadend')})}
 });
 window.XMLHttpRequest=X;
+const fmt=(v,q)=>{try{if(v===undefined)return'undefined';if(v===null)return'null';const t=typeof v;if(t==='string')return q?JSON.stringify(v):v;if(t==='function')return String(v).slice(0,300);if(t!=='object')return String(v);if(v instanceof Error)return v.stack||String(v);if(v instanceof Node)return v.nodeType===1?v.outerHTML.slice(0,500):String(v);const s=new WeakSet();return JSON.stringify(v,(k,x)=>{if(typeof x==='object'&&x){if(s.has(x))return'[Circular]';s.add(x)}else if(typeof x==='function')return'[Function]';return x},2)||String(v)}catch(e){return Object.prototype.toString.call(v)}};
+let lc=0;
+['log','info','warn','error','debug'].forEach(l=>{const o=console[l];console[l]=function(...a){try{if(lc++<2000)post({t:'log',level:l,text:a.map(x=>fmt(x)).join(' ').slice(0,4000)})}catch{}return o.apply(console,a)}});
+addEventListener('error',e=>{if(lc++<2000)post({t:'log',level:'error',text:(e.message||'Error')+(e.filename?' ('+String(e.filename).split('/').pop()+':'+e.lineno+')':'')})});
+addEventListener('unhandledrejection',e=>{if(lc++<2000)post({t:'log',level:'error',text:'Unhandled rejection: '+fmt(e.reason)})});
+addEventListener('message',async e=>{const d=e.data;if(e.source!==PAR||!d)return;
+if(d.t==='dom'){post({t:'domres',html:document.documentElement.outerHTML.slice(0,400000)});return}
+if(d.t!=='eval')return;
+try{let v;try{v=(0,eval)(d.code)}catch(x){if(!(x instanceof SyntaxError))throw x;const nl=String.fromCharCode(10);try{v=(0,eval)('(async()=>('+d.code+'))()')}catch(y){if(!(y instanceof SyntaxError))throw y;v=(0,eval)('(async()=>{'+d.code+nl+'})()')}}
+post({t:'evalres',id:d.id,ok:true,text:fmt(await v,true)})}catch(x){post({t:'evalres',id:d.id,ok:false,text:fmt(x,true)})}});
+addEventListener('contextmenu',e=>{if(e.shiftKey)return;e.preventDefault();e.stopImmediatePropagation();const t=e.target,a=t.closest&&t.closest('a[href]');let link;if(a){try{const u=new URL(a.getAttribute('href'),P);if(/^https?:$/.test(u.protocol))link=u.href}catch{}}
+const path=[];for(let n=t;n&&n.nodeType===1&&path.length<6;n=n.parentElement)path.unshift(n.localName+(n.id?'#'+n.id:'')+(typeof n.className==='string'&&n.className.trim()?'.'+n.className.trim().split(' ')[0]:''));
+post({t:'ctx',x:e.clientX,y:e.clientY,link,sel:String(getSelection()||'').slice(0,5000),node:t.nodeType===1?t.outerHTML.slice(0,3000):'',path:path.join(' > ')})},true);
+addEventListener('pointerdown',()=>post({t:'close'}),true);
+addEventListener('keydown',e=>{if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&/^[ij]$/i.test(e.key))){e.preventDefault();post({t:'key',k:'devtools'})}else if(e.key==='Escape')post({t:'close'})},true);
 })();`;
 // false: pages can only use images/fonts this browser inlined itself (private; dynamically added images stay blank).
 // true: pages may load images and fonts straight from their own sites (thumbnails appear, but those sites see your IP).
 const DIRECT_MEDIA = false;
-const CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; font-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; media-src data:";
+const CSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; font-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; media-src data:";
 
 async function buildPage(url, body, signal) {
   const doc = new DOMParser().parseFromString(body, "text/html"); // inert while parsing
@@ -468,19 +588,25 @@ addEventListener("message", async e => {
   const fr = $("#viewer iframe"), t = active();
   if (!fr || e.source !== fr.contentWindow) return;
   const d = e.data || {};
+  if (devMsg(d, fr, t)) return;
   if (d.t === "nav" && typeof d.url === "string") navigate(t, d.url);
   else if (d.t === "msg" && typeof d.text === "string") { t.status = {text: d.text.slice(0, 200)}; paint(); }
   else if (d.t === "fetch" && typeof d.url === "string" && typeof d.id === "number") {
     try {
       if (!d.url.startsWith("https://")) throw new Error("Only https:// requests are allowed");
+      const t0 = performance.now();
       const m = String(d.method || "GET").toUpperCase();
       if (!["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].includes(m)) throw new Error("Method not allowed");
       const headers = {};
       for (const [k, v] of Object.entries(d.headers || {}).slice(0, 40)) if (typeof v === "string" && v.length < 4000 && /^[\w-]+$/.test(k) && !/^(cookie|host|origin|referer|user-agent|x-proxy-.*)$/i.test(k)) headers[k] = v;
       const r = await pfetch(d.url, t.ctrl && t.ctrl.signal, undefined, {method: m, headers, body: m === "GET" || m === "HEAD" || typeof d.body !== "string" ? undefined : d.body});
       const body = await r.arrayBuffer();
+      devNet(t, {method: m, url: d.url, status: r.status, type: r.headers.get("content-type") || "", bytes: body.byteLength, ms: Math.round(performance.now() - t0)});
       e.source.postMessage({id: d.id, status: r.status, type: r.headers.get("content-type") || "", body}, "*");
-    } catch (err) { e.source.postMessage({id: d.id, err: "Request failed: " + (err.message || err)}, "*"); }
+    } catch (err) {
+      devNet(t, {method: String(d.method || "GET").toUpperCase(), url: d.url, status: 0, type: "failed", bytes: 0, ms: null});
+      e.source.postMessage({id: d.id, err: "Request failed: " + (err.message || err)}, "*");
+    }
   }
 });
 
@@ -489,7 +615,8 @@ function paint(viewToo) {
   const t = active();
   const f = document.activeElement && document.activeElement.dataset.f;
   const strip = $("#tabs");
-  strip.replaceChildren(...tabs.map(x => el("div", {class: "tab" + (x.id === activeId ? " on" : ""), role: "presentation"},
+  strip.replaceChildren(...tabs.map(x => el("div", {class: "tab" + (x.id === activeId ? " on" : "") + (x.loading ? " ld" : ""), role: "presentation"},
+    el("span", {class: "fav", "aria-hidden": "true"}, ((x.title || "?").trim() || "?")[0].toUpperCase()),
     el("button", {class: "t", role: "tab", "aria-selected": x.id === activeId, "data-f": "t" + x.id, title: x.title, onclick: () => switchTab(x.id)}, x.title),
     el("button", {class: "x", "aria-label": "Close tab: " + x.title, "data-f": "x" + x.id, onclick: () => closeTab(x.id)}, "\u00d7"))),
     el("button", {class: "nb", id: "newtab", "aria-label": "New tab", title: "New tab", "data-f": "n", onclick: () => newTab()}, "+"));
@@ -497,7 +624,7 @@ function paint(viewToo) {
   $("#back").disabled = t.index <= 0;
   $("#fwd").disabled = t.index >= t.history.length - 1;
   const rl = $("#reload");
-  rl.textContent = t.loading ? "\u2715" : "\u21bb";
+  rl.querySelector("path").setAttribute("d", t.loading ? "M6 6l12 12M18 6L6 18" : "M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5");
   rl.setAttribute("aria-label", t.loading ? "Stop" : "Reload"); rl.title = t.loading ? "Stop" : "Reload";
   $("#bar").classList.toggle("on", t.loading);
   if (document.activeElement !== $("#url") || viewToo) $("#url").value = t.shown;
@@ -506,12 +633,174 @@ function paint(viewToo) {
   c.textContent = t.status.code || "";
   c.className = t.status.ok ? "ok" : t.status.bad ? "bad" : "";
   document.title = (t.title || "New tab") + " \u2013 Proxy Browser";
+  devRender();
   if (viewToo) {
     const box = $("#viewer");
     box.replaceChildren(); box.scrollTop = 0;
     views[t.view.kind](box, t.view);
   }
 }
+
+/* ---------- Context menu + DevTools ---------- */
+let devOpen = false, devTab = "console", devRaf = 0;
+const cons = {hist: [], hi: 0, pending: new Map(), nid: 0};
+const frameEl = () => $("#viewer iframe");
+const flash = text => { const t = active(); t.status = {text}; paint(); };
+const copy = s => navigator.clipboard ? navigator.clipboard.writeText(s).then(() => flash("Copied"), () => flash("Copy failed")) : flash("Copy is not available here");
+
+function pretty(h) {
+  let d = 0;
+  return h.replace(/>\s*</g, ">\n<").split("\n").map(l => {
+    if (/^<\//.test(l)) d = Math.max(0, d - 1);
+    const o = "  ".repeat(d) + l;
+    if (/^<[^!/][^>]*[^/]>$/.test(l) && !/^<(br|hr|img|input|meta|link|source|area|base|col|embed|wbr)\b/i.test(l) && !/<\//.test(l)) d++;
+    return o;
+  }).join("\n");
+}
+function devNet(t, row) { t.dev.net.push(row); if (t.dev.net.length > 300) t.dev.net.shift(); devRender(); }
+function devRender() { if (devOpen && !devRaf) devRaf = requestAnimationFrame(() => { devRaf = 0; drawDev(); }); }
+function requestDom() { const f = frameEl(); if (f) f.contentWindow.postMessage({t: "dom"}, "*"); }
+
+function devMsg(d, fr, t) {
+  if (d.t === "log" && typeof d.text === "string") {
+    t.dev.logs.push({level: ["log", "info", "warn", "error", "debug"].includes(d.level) ? d.level : "log", text: d.text.slice(0, 4000)});
+    if (t.dev.logs.length > 500) t.dev.logs.shift();
+    devRender(); return true;
+  }
+  if (d.t === "evalres") { const p = cons.pending.get(d.id); if (p) { cons.pending.delete(d.id); p(d); } return true; }
+  if (d.t === "domres" && typeof d.html === "string") { t.dev.dom = pretty(d.html); devRender(); return true; }
+  if (d.t === "close") { closeMenu(); return true; }
+  if (d.t === "key" && d.k === "devtools") { toggleDev(); return true; }
+  if (d.t === "ctx") {
+    const r = fr.getBoundingClientRect(), s = v => typeof v === "string" ? v : "";
+    openMenu(r.left + (+d.x || 0), r.top + (+d.y || 0), {link: /^https?:\/\//.test(s(d.link)) ? d.link : "", sel: s(d.sel), node: s(d.node), path: s(d.path)});
+    return true;
+  }
+  return false;
+}
+
+function menuItems(info) {
+  const t = active(), items = [];
+  items.push({label: "Back", key: "Alt+\u2190", off: t.index <= 0, run: () => go(t, -1)});
+  items.push({label: "Forward", key: "Alt+\u2192", off: t.index >= t.history.length - 1, run: () => go(t, 1)});
+  items.push({label: t.loading ? "Stop" : "Reload", run: () => reload(t)});
+  if (info.link) items.push("-", {label: "Open link", run: () => navigate(t, info.link)}, {label: "Open link in new tab", run: () => newTab(info.link)}, {label: "Copy link address", run: () => copy(info.link)});
+  if (info.sel) items.push("-", {label: "Copy", key: "Ctrl+C", run: () => copy(info.sel)});
+  items.push("-",
+    {label: "Inspect", run: () => { t.dev.sel = info.node ? {html: info.node, path: info.path} : null; showDev("elements"); }},
+    {label: "Console", key: "Ctrl+Shift+J", run: () => showDev("console")},
+    {label: devOpen ? "Close developer tools" : "Developer tools", key: "F12", run: () => toggleDev()});
+  return items;
+}
+function openMenu(x, y, info = {}) {
+  const m = $("#ctx");
+  m.replaceChildren();
+  for (const it of menuItems(info)) {
+    if (it === "-") { m.append(el("hr")); continue; }
+    const b = el("button", {type: "button", role: "menuitem", onclick: () => { closeMenu(); it.run(); }}, el("span", {}, it.label), it.key ? el("kbd", {}, it.key) : "");
+    if (it.off) b.disabled = true;
+    m.append(b);
+  }
+  m.hidden = false;
+  m.style.left = Math.max(4, Math.min(x, innerWidth - m.offsetWidth - 4)) + "px";
+  m.style.top = Math.max(4, Math.min(y, innerHeight - m.offsetHeight - 4)) + "px";
+  const first = m.querySelector("button:not(:disabled)");
+  if (first) first.focus();
+}
+function closeMenu() { $("#ctx").hidden = true; }
+
+function showDev(tab) {
+  devOpen = true; if (tab) devTab = tab;
+  $("#dev").hidden = false; $("#devbtn").setAttribute("aria-pressed", "true");
+  drawDev();
+  if (devTab === "console") $("#conin").focus();
+  if (devTab === "elements") requestDom();
+}
+function toggleDev() {
+  if (devOpen) { devOpen = false; $("#dev").hidden = true; $("#devbtn").setAttribute("aria-pressed", "false"); }
+  else showDev();
+}
+function drawDev() {
+  if (!devOpen) return;
+  const t = active(), d = t.dev, page = t.view.kind === "page";
+  $("#devtabs").querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === devTab)));
+  for (const p of ["console", "elements", "network"]) $("#pane-" + p).hidden = p !== devTab;
+  $("#devinfo").textContent = page ? hostOf(t.shown) : "No page loaded";
+  if (devTab === "console") {
+    const out = $("#conout"), stick = out.scrollTop + out.clientHeight >= out.scrollHeight - 12;
+    const glyph = {error: "\u2715", warn: "!", info: "i", input: "\u203a", result: "\u2039"};
+    out.replaceChildren(...(d.logs.length
+      ? d.logs.map(l => el("div", {class: "ln " + l.level}, el("span", {class: "gl"}, glyph[l.level] || ""), el("pre", {}, l.text)))
+      : [el("div", {class: "empty"}, page ? "Nothing logged yet. Type JavaScript below to run it on this page." : "Load a web page to use the console.")]));
+    if (stick) out.scrollTop = out.scrollHeight;
+  } else if (devTab === "elements") {
+    $("#domsel").textContent = d.sel ? d.sel.path + "\n\n" + pretty(d.sel.html) : "Right-click an element and choose Inspect to see it here.";
+    $("#domhtml").textContent = d.dom || (page ? "Press Refresh to read the live document." : "No page loaded.");
+  } else {
+    const good = s => s >= 200 && s < 400;
+    $("#netbody").replaceChildren(...d.net.map(n => el("tr", {},
+      el("td", {class: good(n.status) ? "ok" : "bad"}, String(n.status || "failed")), el("td", {}, n.method),
+      el("td", {title: n.url}, n.url), el("td", {}, (n.type || "").split(";")[0]),
+      el("td", {}, kb(n.bytes || 0)), el("td", {}, n.ms == null ? "\u2014" : n.ms + " ms"))));
+  }
+}
+function runCode() {
+  const inp = $("#conin"), code = inp.value.trim(), t = active(), fr = frameEl();
+  if (!code) return;
+  cons.hist.push(code); cons.hi = cons.hist.length;
+  inp.value = ""; inp.style.height = "";
+  t.dev.logs.push({level: "input", text: code});
+  if (!fr || t.view.kind !== "page") { t.dev.logs.push({level: "error", text: "No page is loaded in this tab."}); return drawDev(); }
+  const id = ++cons.nid;
+  const timer = setTimeout(() => { if (cons.pending.delete(id)) { t.dev.logs.push({level: "error", text: "No response from the page. It may be busy or its scripts may have stopped."}); devRender(); } }, 8000);
+  cons.pending.set(id, r => { clearTimeout(timer); t.dev.logs.push({level: r.ok ? "result" : "error", text: String(r.text).slice(0, 8000)}); devRender(); });
+  fr.contentWindow.postMessage({t: "eval", id, code}, "*");
+  drawDev();
+}
+
+document.addEventListener("contextmenu", e => {
+  if (e.target.closest("input,textarea")) return; // keep the native menu for paste in text boxes
+  e.preventDefault();
+  openMenu(e.clientX, e.clientY);
+});
+document.addEventListener("pointerdown", e => { if (!e.target.closest("#ctx")) closeMenu(); });
+addEventListener("blur", closeMenu);
+addEventListener("resize", closeMenu);
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeMenu();
+  else if (e.key === "F12" || (e.ctrlKey && e.shiftKey && /^[ij]$/i.test(e.key))) { e.preventDefault(); if (e.key.toLowerCase() === "j") showDev("console"); else toggleDev(); }
+});
+$("#ctx").addEventListener("keydown", e => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  e.preventDefault();
+  const bs = [...$("#ctx").querySelectorAll("button:not(:disabled)")], i = bs.indexOf(document.activeElement);
+  bs[(i + (e.key === "ArrowDown" ? 1 : -1) + bs.length) % bs.length].focus();
+});
+$("#menubtn").addEventListener("click", e => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.right - 240, r.bottom + 6); });
+$("#devbtn").addEventListener("click", toggleDev);
+$("#devclose").addEventListener("click", toggleDev);
+$("#devclear").addEventListener("click", () => { const d = active().dev; d.logs = []; d.net = []; d.sel = null; d.dom = ""; drawDev(); });
+$("#devtabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) showDev(b.dataset.tab); });
+$("#domrefresh").addEventListener("click", requestDom);
+$("#conform").addEventListener("submit", e => { e.preventDefault(); runCode(); });
+$("#conin").addEventListener("input", e => { e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px"; });
+$("#conin").addEventListener("keydown", e => {
+  const inp = e.target;
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runCode(); }
+  else if (e.key === "ArrowUp" && inp.selectionStart === 0 && cons.hi > 0) { e.preventDefault(); inp.value = cons.hist[--cons.hi]; }
+  else if (e.key === "ArrowDown" && inp.selectionStart === inp.value.length && cons.hi < cons.hist.length) { e.preventDefault(); inp.value = cons.hist[++cons.hi] || ""; }
+});
+const grip = $("#devgrip");
+const setDevH = h => document.documentElement.style.setProperty("--devh", Math.round(Math.max(140, Math.min(h, $("#work").clientHeight - 120))) + "px");
+grip.addEventListener("pointerdown", e => {
+  grip.setPointerCapture(e.pointerId);
+  const mv = ev => setDevH($("#work").getBoundingClientRect().bottom - ev.clientY);
+  const up = () => { grip.removeEventListener("pointermove", mv); grip.removeEventListener("pointerup", up); };
+  grip.addEventListener("pointermove", mv); grip.addEventListener("pointerup", up);
+});
+grip.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); setDevH($("#dev").offsetHeight + (e.key === "ArrowUp" ? 24 : -24)); }
+});
 
 /* ---------- Wiring ---------- */
 $("#go").addEventListener("submit", e => { e.preventDefault(); navigate(active(), $("#url").value); $("#viewer").focus(); });
