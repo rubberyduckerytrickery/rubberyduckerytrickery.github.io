@@ -458,11 +458,27 @@ const path=[];for(let n=t;n&&n.nodeType===1&&path.length<6;n=n.parentElement)pat
 post({t:'ctx',x:e.clientX,y:e.clientY,link,sel:String(getSelection()||'').slice(0,5000),node:t.nodeType===1?t.outerHTML.slice(0,3000):'',path:path.join(' > ')})},true);
 addEventListener('pointerdown',()=>post({t:'close'}),true);
 addEventListener('keydown',e=>{if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&/^[ij]$/i.test(e.key))){e.preventDefault();post({t:'key',k:'devtools'})}else if(e.key==='Escape')post({t:'close'})},true);
+const seen=new WeakSet(),ic=new Map(),wq=[];let chain=Promise.resolve(),act=0;
+const abs=u=>{try{const x=new URL(u,P);return /^https?:$/.test(x.protocol)?x.href:null}catch{return null}};
+const rfetch=(url,rt)=>new Promise((res,rej)=>{const id=++n;pend[id]={res,rej};post({t:'fetch',id,url,method:'GET',headers:{},rt})}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r});
+const lim=f=>new Promise((res,rej)=>{const go=()=>{act++;f().then(res,rej).finally(()=>{act--;if(wq.length)wq.shift()()})};act<6?go():wq.push(go)});
+const run=el=>{const tag=el.tagName;
+if(tag==='SCRIPT'){const s=el.getAttribute('src');if(!s||el.type==='module'||seen.has(el))return;const u=abs(s);if(!u)return;seen.add(el);el.__p=1;
+const go=()=>lim(()=>rfetch(u,'js')).then(r=>r.text()).then(t=>{const x=document.createElement('script');x.textContent=t;(document.head||document.documentElement).appendChild(x);x.remove();el.__p=0;el.dispatchEvent(new Event('load'))},()=>{el.__p=0;el.dispatchEvent(new Event('error'))});
+if(el.async===false)chain=chain.then(go);else go()}
+else if(tag==='LINK'){const h=el.getAttribute('href');if(!h||!/stylesheet/i.test(el.rel)||seen.has(el))return;const u=abs(h);if(!u)return;seen.add(el);el.__p=1;
+lim(()=>rfetch(u,'css')).then(r=>r.text()).then(t=>{const st=document.createElement('style');st.textContent=t;if(el.media)st.media=el.media;el.after(st);el.__p=0;el.dispatchEvent(new Event('load'))},()=>{el.__p=0;el.dispatchEvent(new Event('error'))})}
+else if(tag==='IMG'){const s=el.getAttribute('src');if(!s||/^(data|blob):/.test(s)||el.__u===s)return;const u=abs(s);if(!u)return;el.__u=s;el.__p=1;
+const p=ic.get(u)||lim(()=>rfetch(u,'img')).then(r=>r.blob()).then(b=>URL.createObjectURL(b));ic.set(u,p);
+p.then(b=>{el.__p=0;if(el.getAttribute('src')===s)el.src=b},()=>{ic.delete(u);el.__p=0;el.dispatchEvent(new Event('error'))})}};
+const scan=x=>{if(x.nodeType!==1)return;if(/^(SCRIPT|LINK|IMG)$/.test(x.tagName))run(x);if(x.querySelectorAll)x.querySelectorAll('script[src],link[href],img[src]').forEach(run)};
+new MutationObserver(ms=>{for(const m of ms){if(m.type==='attributes')run(m.target);else m.addedNodes.forEach(scan)}}).observe(document,{subtree:true,childList:true,attributes:true,attributeFilter:['src','href']});
+addEventListener('error',e=>{const t=e.target;if(t&&t!==window&&t.__p)e.stopImmediatePropagation()},true);
 })();`;
 // false: pages can only use images/fonts this browser inlined itself (private; dynamically added images stay blank).
 // true: pages may load images and fonts straight from their own sites (thumbnails appear, but those sites see your IP).
 const DIRECT_MEDIA = false;
-const CSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; font-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; media-src data:";
+const CSP = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:" + (DIRECT_MEDIA ? " https:" : "") + "; font-src data:" + (DIRECT_MEDIA ? " https:" : "") + "; media-src data:";
 
 async function buildPage(url, body, signal) {
   const doc = new DOMParser().parseFromString(body, "text/html"); // inert while parsing
@@ -599,7 +615,7 @@ addEventListener("message", async e => {
       if (!["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"].includes(m)) throw new Error("Method not allowed");
       const headers = {};
       for (const [k, v] of Object.entries(d.headers || {}).slice(0, 40)) if (typeof v === "string" && v.length < 4000 && /^[\w-]+$/.test(k) && !/^(cookie|host|origin|referer|user-agent|x-proxy-.*)$/i.test(k)) headers[k] = v;
-      const r = await pfetch(d.url, t.ctrl && t.ctrl.signal, undefined, {method: m, headers, body: m === "GET" || m === "HEAD" || typeof d.body !== "string" ? undefined : d.body});
+      const r = await pfetch(d.url, t.ctrl && t.ctrl.signal, undefined, {method: m, headers, body: m === "GET" || m === "HEAD" || typeof d.body !== "string" ? undefined : d.body, bundle: d.rt === "css"});
       const body = await r.arrayBuffer();
       devNet(t, {method: m, url: d.url, status: r.status, type: r.headers.get("content-type") || "", bytes: body.byteLength, ms: Math.round(performance.now() - t0)});
       e.source.postMessage({id: d.id, status: r.status, type: r.headers.get("content-type") || "", body}, "*");
