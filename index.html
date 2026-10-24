@@ -350,7 +350,7 @@ function showError(tab, d) {
   if (tab === active()) paint(true);
 }
 function explain(code, host, isSearch) {
-  if (isSearch) return "The search provider (" + host + ") could not be reached through your proxy. Its hostname allowlist probably does not include it. Add the host to the allowlist on your server, or change SEARCH_TEMPLATE.";
+  if (isSearch) return "The search provider (" + host + ") did not return a usable result. It may be blocking automated requests from your proxy, or the proxy itself may be unreachable. Try a different SEARCH_TEMPLATE near the top of the script.";
   switch (code) {
     case 400: return "The proxy rejected the request. It only accepts valid https:// URLs.";
     case 403: return "The proxy refused this request: the address is private or local, the site blocked the proxy, or this page\u2019s origin isn\u2019t allowed. See the details below.";
